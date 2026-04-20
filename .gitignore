@@ -1,0 +1,8 @@
+# Ignore le fichier .env contenant les variables d'environnement sensibles
+/.env
+
+# Ignore les fichiers à ne pas push sur GitHub
+/BD/mindmaps.mwb
+/mindmaps.mwb
+/mindmaps.mwb.bak
+/BD/mindmaps.sql
