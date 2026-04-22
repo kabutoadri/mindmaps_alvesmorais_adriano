@@ -9,7 +9,7 @@ import tkinter.ttk as ttk
 from tkinter import messagebox, simpledialog
 from login import show_login
 from tree_display import display_array
-from model import get_maps,  get_nodes_for_map
+from model import get_maps,  get_nodes_for_map, get_users, get_nodes
 from utils.session import Session
 import math
 
@@ -26,7 +26,17 @@ def display_maps():
     result = get_maps(db_mode)
     frm_result.tree = display_array(frm_result, result)
     frm_result.tree.bind("<Double-1>", on_map_double_click) # double clic pour afficher le mindmap dans right_frame selon le mode sélectionné (tree, radial ou forum)
-       
+
+# affichage des users
+def display_users():
+    result = get_users(db_mode)
+    frm_result.tree = display_array(frm_result, result)
+
+# affichage des nodes
+def display_nodes():
+    result = get_nodes(db_mode)
+    frm_result.tree = display_array(frm_result, result)
+
 # traitement de l'affichage d'un mindmap selon le mode sélectionné (tree, radial ou forum)
 def on_map_double_click(event):
     selected = frm_result.tree.selection()
@@ -206,7 +216,9 @@ menubar = tk.Menu(root)
 
 # Menu Afficher
 display_menu = tk.Menu(menubar, tearoff=0)
+display_menu.add_command(label="Users", command=display_users)
 display_menu.add_command(label="Maps", command=display_maps)
+display_menu.add_command(label="Nodes", command=display_nodes)
 menubar.add_cascade(label="Afficher", menu=display_menu)
 
 # Menu Login/Register

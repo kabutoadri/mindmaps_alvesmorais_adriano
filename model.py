@@ -42,6 +42,14 @@ def get_nodes_for_map(map_id, db_mode):
     "from nodes inner join users on nodes.author_id = users.id " \
     "where map_id=%s", (map_id,), db_mode)
 
+# renvoie la liste des users
+def get_users(db_mode):
+    return fetch_all("select id, pseudo, level from users", None, db_mode)
+
+# renvoie la liste des nodes
+def get_nodes(db_mode):
+    return fetch_all("select map_id, parent_id, author_id, text, level from nodes", None, db_mode)
+
 # fonctions pour insérer, mettre à jour et supprimer des maps et des nodes
 # fonction pour insérer un node (retourne l'id du node créé)
 
