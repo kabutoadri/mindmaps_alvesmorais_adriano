@@ -2,7 +2,7 @@
 # JCY pour SI-CA1 (projet Python) - 2025-2026
 # 13 avril 2026
 # Modifications : Adriano Alves Morais, le 04.05.2026
-# login.py : affichage de la fenêtre de connexion
+# login.py : affichage de la fenêtre de connexion et d'inscription
 
 import tkinter as tk
 from tkinter import messagebox, colorchooser

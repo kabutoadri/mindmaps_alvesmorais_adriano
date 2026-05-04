@@ -2,7 +2,7 @@
 # JCY pour SI-CA1 (projet Python) - 2025-2026
 # 13 avril 2026
 # Modifications : Adriano Alves Morais, le 04.05.2026
-# session.py : affichage d'un tableau de données dans un TreeView
+# session.py : Gestion de la session utilisateur (stockage du pseudo et du niveau d'accès)
 
 # utils/session.py : gestion de la session utilisateur (stockage du pseudo et du niveau d'accès)
 class Session:

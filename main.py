@@ -3,7 +3,7 @@
 # JCY pour SI-CA1 (projet Python) - 2025-2026 -v0.1
 # 13 avril 2026
 # Modifications : Adriano Alves Morais, le 04.05.2026
-# main.py : affichage de la fenêtre principale, gestion de la connexion et des différentes vues (tables + mindmap)
+# main.py : affichage de la fenêtre principale, gestion de la connexion et des différentes vues (tables + mindmaps)
 
 import tkinter as tk
 import tkinter.ttk as ttk
@@ -68,8 +68,8 @@ def display_mindmap(map_id):
             display_mindmap_tree(right_frame, nodes)
         elif mode == 'forum':
             display_mindmap_forum(right_frame, nodes)
-        elif mode == 'radial':
-            display_mindmap_radial(right_frame, nodes)
+        elif mode == 'organigramme':
+            display_mindmap_organigramme(right_frame, nodes)
     else:
         tk.Label(right_frame, text="Aucun node pour ce mindmap").pack()
 
@@ -204,8 +204,8 @@ def display_mindmap_forum(frame, nodes):
     place_forum(root_node, 20, 20, 50) # le root prend 50% de la largeur, les enfants 45%, etc. 
     update_scroll_region()
 
-# Affichage des mindmaps en mode radial
-def display_mindmap_radial(frame, nodes):
+# Affichage des mindmaps en mode organigramme
+def display_mindmap_organigramme(frame, nodes):
     container = tk.Frame(frame)
     container.pack(fill='both', expand=True)
 
@@ -219,7 +219,7 @@ def display_mindmap_radial(frame, nodes):
     hsb.pack(side="bottom", fill="x")
     canvas.pack(side="left", fill="both", expand=True)
 
-    # Donne le focus au canvas pour permettre le scroll avec la molette, lorsque la souris le survole.
+    # Donne le focus au canvas pour permettre le scroll avec la molette
     canvas.bind("<Enter>", lambda e: canvas.focus_set())
 
     # Scroll vertical
@@ -235,167 +235,125 @@ def display_mindmap_radial(frame, nodes):
     canvas.bind("<Configure>", update_scroll_region)
 
     # Trouver le root
-    root_node = next(
-        (n for n in nodes if n['parent_id'] is None or n['parent_id'] == 0),
-        None
-    )
-    # Si pas de root
+    root_node = next((n for n in nodes if n['parent_id'] is None or n['parent_id'] == 0), None)
     if not root_node:
         return
 
-    # Taille du canvas
+    # longueur du canvas
     canvas_width = 800
-    canvas_height = 600
 
-    # Centrage
-    center_x = canvas_width // 2
-    center_y = canvas_height // 2
+    # taille des nodes
+    node_width = 100 # longueur
+    node_height = 50 # largeur
 
-    # Taille des nodes
-    node_width = 150
-    node_height = 36
+    # espacement entre les nodes
+    gap_x = 40 # horizontal
+    gap_y = 80 # vertical
 
-    # Distance en les nodes
-    node_distance = 145
+    # Crée un rectangle arrondi
+    def create_rounded_rectangle(canvas, x1, y1, x2, y2, radius=10, **kwargs):
+        radius = min(radius, abs(x2 - x1)//2, abs(y2 - y1)//2) # calcul du radius
 
-    positions = {}
+        # différents points qui composent le rectangle arrondi (comme pour la vue forum)
+        points = [
+            x1 + radius, y1, x2 - radius, y1,
+            x2, y1, x2, y1 + radius,
+            x2, y2 - radius, x2, y2,
+            x2 - radius, y2, x1 + radius, y2,
+            x1, y2, x1, y2 - radius,
+            x1, y1 + radius, x1, y1,
+            x1 + radius, y1
+        ]
+
+        return canvas.create_polygon(points, smooth=True, **kwargs)
 
     # Récupère les enfants directs d'un node
     def get_children(node):
         return [n for n in nodes if n['parent_id'] == node['id']]
 
-    # Compte simplement combien de nodes existe sous une branche
-    def count_nodes(node):
-        children = get_children(node)
-        # Pas d'enfants
+    # Compte combien de place une branche doit prendre
+    def count_width(node):
+        total_width = 0 # longueur totale du node et ses enfants
+
+        children = get_children(node) # récupère tout les enfants du node
+
+        # si pas d'enfant, on retourne simplement le node parent avec le gap horizontal
         if not children:
-            return 1
+            return node_width + gap_x
 
-        total = 1
-
+        # calcul la longueur total que prendra un node et ses enfants (récursif)
         for child in children:
-            total += count_nodes(child)
+            total_width += count_width(child)
 
-        return total
+        return total_width
 
-    # Vérifie si deux nodes sont trop proches
-    def is_overlapping(x1, y1, x2, y2):
-        return (
-            abs(x1 - x2) < node_width + 15
-            and abs(y1 - y2) < node_height + 15
-        )
-
-    # Décale un node si sa position touche déjà un autre node
-    def avoid_overlap(x, y):
-        moved = True
-
-        while moved:
-            moved = False
-
-            for other_x, other_y, other_level in positions.values():
-                if is_overlapping(x, y, other_x, other_y):
-                    x += 20
-                    y += 20
-                    moved = True
-
-        return x, y
-
-    # Crée un node ovale avec son texte
-    def create_oval_node(node, x, y, level=0):
+    # Crée visuellement un node
+    def create_node(node, x, y, level=0):
         color = 'lightblue' if level == 0 else node.get("color", "white")
 
-        oval = canvas.create_oval(
-            x - node_width / 2.5,
-            y - node_height / 1.5,
-            x + node_width / 2.5,
-            y + node_height / 1.5,
+        # créer le rectangle du node
+        item = create_rounded_rectangle(
+            canvas,
+            x,
+            y,
+            x + node_width,
+            y + node_height,
+            radius=10,
             fill=color,
             outline='black'
         )
 
-        text = canvas.create_text(
-            x,
-            y,
-            text=node['text'][:35],
+        # créer le texte du node
+        canvas.create_text(
+            x + node_width / 2,
+            y + node_height / 2,
+            text=node['text'][:28], #maximum 28 caractères pour ne pas dépasser du rectangle
             anchor='center',
-            font=("Arial", 9),
-            width=node_width - 12
+            font=("Arial", 10),
+            width=node_width - 10
         )
 
-        # Clic droit sur l'ovale ou le texte
-        canvas.tag_bind(oval, "<Button-3>", lambda e, n=node: edit_node(e, n))
-        canvas.tag_bind(text, "<Button-3>", lambda e, n=node: edit_node(e, n))
+        # Clic droit sur le node
+        canvas.tag_bind(item, "<Button-3>", lambda e, n=node: edit_node(e, n)) # n contient les infos du node pour l'édition
 
-    # Place les nodes en radial de manière récursive
-    def place_radial(node, level=0, start_angle=-180, end_angle=180):
-        children = get_children(node)
+    # Place les nodes en organigramme de manière récursive
+    def place_organigramme(node, x, y, level=0):
+        create_node(node, x, y, level) # création du node
 
+        children = get_children(node) # récupère tout les enfants du node
+
+        # si pas d'enfant retourne juste le parent
         if not children:
-            return
+            return count_width(node)
 
-        total = sum(count_nodes(child) for child in children)
-        current_angle = start_angle
+        total_width = count_width(node) # longeur total d'un node et ses enfants
+
+        child_posy = y + node_height + gap_y # calcul de la position en Y des enfants avec un espace entre eux
+        current_posx = x - total_width / 2 + node_width / 2 # calcul de la position actuel en X du node
 
         for child in children:
-            child_total = count_nodes(child)
+            child_width = count_width(child) # longueur de l'enfant
 
-            angle_size = (end_angle - start_angle) * child_total / total
-            angle = current_angle + angle_size / 2
+            child_posx = current_posx + child_width / 2 - node_width / 2 # calcul de la position en X de l'enfant
 
-            angle_rad = math.radians(angle)
-            distance = node_distance * (level + 1)
-
-            child_x = center_x + math.cos(angle_rad) * distance
-            child_y = center_y + math.sin(angle_rad) * distance
-
-            child_x, child_y = avoid_overlap(child_x, child_y)
-
-            positions[child['id']] = (child_x, child_y, level + 1)
-
-            place_radial(
-                child,
-                level + 1,
-                current_angle,
-                current_angle + angle_size
+            # Ligne parent → enfant
+            canvas.create_line(
+                x + node_width / 2,
+                y + node_height,
+                child_posx + node_width / 2,
+                child_posy,
+                fill='gray',
+                width=1
             )
 
-            current_angle += angle_size
+            place_organigramme(child, child_posx, child_posy, level + 1)
 
-    # Dessine les lignes entre parent et enfant
-    def draw_lines():
-        for node in nodes:
-            parent_id = node['parent_id']
+            current_posx += child_width
 
-            if parent_id is None or parent_id == 0:
-                continue
+        return total_width
 
-            if parent_id in positions and node['id'] in positions:
-                parent_x, parent_y, _ = positions[parent_id]
-                child_x, child_y, _ = positions[node['id']]
-
-                canvas.create_line(
-                    parent_x,
-                    parent_y,
-                    child_x,
-                    child_y,
-                    fill='gray',
-                    width=1
-                )
-
-    # Le root est placé au centre
-    positions[root_node['id']] = (center_x, center_y, 0)
-
-    # Placement des enfants autour du root
-    place_radial(root_node)
-
-    # Les lignes sont dessinées avant les nodes pour rester derrière
-    draw_lines()
-
-    # Dessin des nodes
-    for node in nodes:
-        if node['id'] in positions:
-            x, y, level = positions[node['id']]
-            create_oval_node(node, x, y, level)
+    # Placement du root au centre en haut
+    place_organigramme(root_node, canvas_width / 2 - node_width / 2, 40)
 
     update_scroll_region()
 
@@ -520,8 +478,8 @@ frm_options.grid(column=0, row=2, pady=10)
 tk.Label(frm_options, text="Mode d'affichage Mindmap:").pack(anchor='w')
 tk.Radiobutton(frm_options, text="Treeview", variable=display_mode, value='tree', command=refresh_mindmap).pack(anchor='w')
 tk.Radiobutton(frm_options, text="Forum", variable=display_mode, value='forum', command=refresh_mindmap).pack(anchor='w')
-# Radio bouton pour l'affichage radial
-tk.Radiobutton(frm_options, text="Radial", variable=display_mode, value='radial', command=refresh_mindmap).pack(anchor='w')
+# Radio bouton pour l'affichage organigramme
+tk.Radiobutton(frm_options, text="Organigramme", variable=display_mode, value='organigramme', command=refresh_mindmap).pack(anchor='w')
 
 # frame pour l'affichage des résultats dans left_frame
 frm_result = tk.Frame(left_frame, bg="lightgreen")
