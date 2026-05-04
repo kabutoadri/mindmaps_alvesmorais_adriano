@@ -1,6 +1,7 @@
 # Projet mindmaps : prototype d'affichage de mindmap en radial et forum 
 # JCY pour SI-CA1 (projet Python) - 2025-2026
 # 13 avril 2026
+# Modifications : Adriano Alves Morais, le 04.05.2026
 # tree_display.py : affichage d'un tableau de données dans un TreeView
 
 import tkinter as tk
@@ -51,7 +52,7 @@ def display_array(frame, data):
 
     # colonnes + largeur automatique
     for col in columns:
-        tree.heading(col, text=col)
+        tree.heading(col, text=col, command=lambda c=col: sort_by_column(tree, c, data, columns)) # trie des colonnes
         tree.heading(col, anchor="w") # alignement à gauche
         tree.column(col, width=tkFontMeasure(tree, col, data), stretch=True)
 
@@ -69,6 +70,16 @@ def insert_rows(tree, data, columns):
         values = [row_dict[col] for col in columns]
         tree.insert("", tk.END, values=values)
 
+# fonction de tri des colonnes
+def sort_by_column(tree, col, data, columns):
+    # détecter tri ascendant/descendant
+    descending = getattr(tree, "sort_desc_"+col, False)
+    setattr(tree, "sort_desc_"+col, not descending)
+
+    data.sort(key=lambda r: r[col], reverse=descending)
+
+    # réaffichage
+    insert_rows(tree, data, columns)
 
 def tkFontMeasure(tree, col, data):
     """ Calcule automatiquement la largeur idéale d’une colonne """

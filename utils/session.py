@@ -1,7 +1,8 @@
 # Projet mindmaps : prototype d'affichage de mindmap en radial et forum 
 # JCY pour SI-CA1 (projet Python) - 2025-2026
 # 13 avril 2026
-# tree_display.py : affichage d'un tableau de données dans un TreeView
+# Modifications : Adriano Alves Morais, le 04.05.2026
+# session.py : affichage d'un tableau de données dans un TreeView
 
 # utils/session.py : gestion de la session utilisateur (stockage du pseudo et du niveau d'accès)
 class Session:
@@ -24,4 +25,11 @@ class Session:
     # Méthode pour le logout de l'utilisateur
     @classmethod 
     def logout(cls):
-        None # à implémenter
+        cls.pseudo = None
+        cls.level = None
+        cls.id = None
+
+    # Méthode pour vérifier si un utilisateur est déconnecté
+    @classmethod
+    def is_unauthenticated(cls):
+        return cls.pseudo is None

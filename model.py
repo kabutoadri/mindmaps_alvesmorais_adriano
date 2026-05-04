@@ -1,6 +1,7 @@
 # Projet mindmaps : prototype d'affichage de mindmap en radial et forum 
 # JCY pour SI-CA1 (projet Python) - 2025-2026
 # 13 avril 2026
+# Modifications : Adriano Alves Morais, le 04.05.2026
 # model.py : définition des fonctions pour interagir avec la base de données
 
 import mysql.connector
@@ -70,3 +71,22 @@ def check_login(pseudo, password, db_mode="local"):
         return row
     return None
 
+# fonction qui vérifie si le pseudo est déjà dans la base de données
+def check_register(pseudo, db_mode="local"):
+    db = get_connection(db_mode)
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("SELECT pseudo FROM users WHERE pseudo=%s", (pseudo,))
+    row = cursor.fetchone()
+    db.close()
+    if row:
+        return row
+    return None
+
+# fonction pour enregistrer un nouvel utilisateur (pseudo, mot de passe hashé, couleur)
+def save_register(pseudo, password, color, db_mode="local"):
+    db = get_connection(db_mode)
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("INSERT INTO users (pseudo, hash, level, color) VALUES (%s, %s, %s, %s)", (pseudo, password, 1, color))
+    db.commit()
+    db.close()
+    pass

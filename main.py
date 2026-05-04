@@ -2,12 +2,13 @@
 # avec possibilité d'éditer les nodes (si auteur) ou d'en ajouter en dessous    
 # JCY pour SI-CA1 (projet Python) - 2025-2026 -v0.1
 # 13 avril 2026
+# Modifications : Adriano Alves Morais, le 04.05.2026
 # main.py : affichage de la fenêtre principale, gestion de la connexion et des différentes vues (tables + mindmap)
 
 import tkinter as tk
 import tkinter.ttk as ttk
 from tkinter import messagebox, simpledialog
-from login import show_login
+from login import show_login, show_register
 from tree_display import display_array
 from model import get_maps,  get_nodes_for_map, get_users, get_nodes
 from utils.session import Session
@@ -35,6 +36,12 @@ def display_users():
 # affichage des nodes
 def display_nodes():
     result = get_nodes(db_mode)
+
+    # remplace les valeurs none par -1 pour éviter les erreurs
+    for node in result:
+        if node["parent_id"] is None:
+            node["parent_id"] = 0
+
     frm_result.tree = display_array(frm_result, result)
 
 # traitement de l'affichage d'un mindmap selon le mode sélectionné (tree, radial ou forum)
@@ -61,6 +68,8 @@ def display_mindmap(map_id):
             display_mindmap_tree(right_frame, nodes)
         elif mode == 'forum':
             display_mindmap_forum(right_frame, nodes)
+        elif mode == 'radial':
+            display_mindmap_radial(right_frame, nodes)
     else:
         tk.Label(right_frame, text="Aucun node pour ce mindmap").pack()
 
@@ -81,11 +90,22 @@ def display_mindmap_tree(frame, nodes):
     tree.configure(style="Right.Treeview")
 
     # Fonction récursive pour insérer les nodes
-    def insert_nodes(parent, parent_id=None):
+    def insert_nodes(parent, parent_id=None, level=0):
         for node in nodes:
             if node['parent_id'] == parent_id:
-                item = tree.insert(parent, 'end', text=node['text'])  # Seulement le text
-                insert_nodes(item, node['id'])
+
+                # Récupère la couleur de l'auteur du node sauf si le level est 0 (couleur par défaut du titre des maps)
+                if level == 0:
+                    color = "lightblue"
+                else:
+                    color = node.get("color", "black")
+                # Crée un nom de tag unique pour l'utilisateur
+                tag_name = f"user_color_{color}"
+                # Configure le tag : le texte de la ligne aura cette couleur
+                tree.tag_configure(tag_name, foreground=color)
+
+                item = tree.insert(parent, 'end', text=node['text'],tags=(tag_name,))  # Seulement le text (ajout du tags pour la couleur de la ligne)
+                insert_nodes(item, node['id'], level + 1) # Ajout de level + 1 pour séparer la couleur du titre d'un node avec les autres
 
     insert_nodes('')
 
@@ -97,6 +117,16 @@ def display_mindmap_tree(frame, nodes):
     tree.pack(side='left', fill='both', expand=True)
     vsb.pack(side='right', fill='y')
     hsb.pack(side='bottom', fill='x')
+
+    # Donne le focus au canvas pour permettre le scroll avec la molette, lorsque la souris le survole.
+    tree.bind("<Enter>", lambda e: tree.focus_set())
+
+    # Scroll vertical
+    tree.bind("<MouseWheel>", lambda e: tree.yview_scroll(int(-1 * (e.delta / 120)), "units"))
+
+    # Scroll horizontal avec SHIFT
+    tree.bind("<Shift-MouseWheel>", lambda e: tree.xview_scroll(int(-1 * (e.delta / 120)), "units"))
+
 
 # Affichage du mindmap en forum (version plus compacte et adaptée à l'affichage de nombreux nodes, avec possibilité d'éditer les nodes ou d'en ajouter en dessous)
 def display_mindmap_forum(frame, nodes):
@@ -112,6 +142,15 @@ def display_mindmap_forum(frame, nodes):
     vsb.pack(side="right", fill="y")
     hsb.pack(side="bottom", fill="x")
     canvas.pack(side="left", fill="both", expand=True)
+
+    # Donne le focus au canvas pour permettre le scroll avec la molette, lorsque la souris le survole.
+    canvas.bind("<Enter>", lambda e: canvas.focus_set())
+
+    # Scroll vertical
+    canvas.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1 * (e.delta / 120)), "units"))
+
+    # Scroll horizontal avec SHIFT
+    canvas.bind("<Shift-MouseWheel>", lambda e: canvas.xview_scroll(int(-1 * (e.delta / 120)), "units"))
 
     # Mise à jour de la zone scrollable
     def update_scroll_region(event=None):
@@ -165,6 +204,201 @@ def display_mindmap_forum(frame, nodes):
     place_forum(root_node, 20, 20, 50) # le root prend 50% de la largeur, les enfants 45%, etc. 
     update_scroll_region()
 
+# Affichage des mindmaps en mode radial
+def display_mindmap_radial(frame, nodes):
+    container = tk.Frame(frame)
+    container.pack(fill='both', expand=True)
+
+    canvas = tk.Canvas(container, bg='white')
+    vsb = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
+    hsb = ttk.Scrollbar(container, orient="horizontal", command=canvas.xview)
+
+    canvas.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
+
+    vsb.pack(side="right", fill="y")
+    hsb.pack(side="bottom", fill="x")
+    canvas.pack(side="left", fill="both", expand=True)
+
+    # Donne le focus au canvas pour permettre le scroll avec la molette, lorsque la souris le survole.
+    canvas.bind("<Enter>", lambda e: canvas.focus_set())
+
+    # Scroll vertical
+    canvas.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1 * (e.delta / 120)), "units"))
+
+    # Scroll horizontal avec SHIFT
+    canvas.bind("<Shift-MouseWheel>", lambda e: canvas.xview_scroll(int(-1 * (e.delta / 120)), "units"))
+
+    # Mise à jour de la zone scrollable
+    def update_scroll_region(event=None):
+        canvas.configure(scrollregion=canvas.bbox("all"))
+
+    canvas.bind("<Configure>", update_scroll_region)
+
+    # Trouver le root
+    root_node = next(
+        (n for n in nodes if n['parent_id'] is None or n['parent_id'] == 0),
+        None
+    )
+    # Si pas de root
+    if not root_node:
+        return
+
+    # Taille du canvas
+    canvas_width = 800
+    canvas_height = 600
+
+    # Centrage
+    center_x = canvas_width // 2
+    center_y = canvas_height // 2
+
+    # Taille des nodes
+    node_width = 150
+    node_height = 36
+
+    # Distance en les nodes
+    node_distance = 145
+
+    positions = {}
+
+    # Récupère les enfants directs d'un node
+    def get_children(node):
+        return [n for n in nodes if n['parent_id'] == node['id']]
+
+    # Compte simplement combien de nodes existe sous une branche
+    def count_nodes(node):
+        children = get_children(node)
+        # Pas d'enfants
+        if not children:
+            return 1
+
+        total = 1
+
+        for child in children:
+            total += count_nodes(child)
+
+        return total
+
+    # Vérifie si deux nodes sont trop proches
+    def is_overlapping(x1, y1, x2, y2):
+        return (
+            abs(x1 - x2) < node_width + 15
+            and abs(y1 - y2) < node_height + 15
+        )
+
+    # Décale un node si sa position touche déjà un autre node
+    def avoid_overlap(x, y):
+        moved = True
+
+        while moved:
+            moved = False
+
+            for other_x, other_y, other_level in positions.values():
+                if is_overlapping(x, y, other_x, other_y):
+                    x += 20
+                    y += 20
+                    moved = True
+
+        return x, y
+
+    # Crée un node ovale avec son texte
+    def create_oval_node(node, x, y, level=0):
+        color = 'lightblue' if level == 0 else node.get("color", "white")
+
+        oval = canvas.create_oval(
+            x - node_width / 2.5,
+            y - node_height / 1.5,
+            x + node_width / 2.5,
+            y + node_height / 1.5,
+            fill=color,
+            outline='black'
+        )
+
+        text = canvas.create_text(
+            x,
+            y,
+            text=node['text'][:35],
+            anchor='center',
+            font=("Arial", 9),
+            width=node_width - 12
+        )
+
+        # Clic droit sur l'ovale ou le texte
+        canvas.tag_bind(oval, "<Button-3>", lambda e, n=node: edit_node(e, n))
+        canvas.tag_bind(text, "<Button-3>", lambda e, n=node: edit_node(e, n))
+
+    # Place les nodes en radial de manière récursive
+    def place_radial(node, level=0, start_angle=-180, end_angle=180):
+        children = get_children(node)
+
+        if not children:
+            return
+
+        total = sum(count_nodes(child) for child in children)
+        current_angle = start_angle
+
+        for child in children:
+            child_total = count_nodes(child)
+
+            angle_size = (end_angle - start_angle) * child_total / total
+            angle = current_angle + angle_size / 2
+
+            angle_rad = math.radians(angle)
+            distance = node_distance * (level + 1)
+
+            child_x = center_x + math.cos(angle_rad) * distance
+            child_y = center_y + math.sin(angle_rad) * distance
+
+            child_x, child_y = avoid_overlap(child_x, child_y)
+
+            positions[child['id']] = (child_x, child_y, level + 1)
+
+            place_radial(
+                child,
+                level + 1,
+                current_angle,
+                current_angle + angle_size
+            )
+
+            current_angle += angle_size
+
+    # Dessine les lignes entre parent et enfant
+    def draw_lines():
+        for node in nodes:
+            parent_id = node['parent_id']
+
+            if parent_id is None or parent_id == 0:
+                continue
+
+            if parent_id in positions and node['id'] in positions:
+                parent_x, parent_y, _ = positions[parent_id]
+                child_x, child_y, _ = positions[node['id']]
+
+                canvas.create_line(
+                    parent_x,
+                    parent_y,
+                    child_x,
+                    child_y,
+                    fill='gray',
+                    width=1
+                )
+
+    # Le root est placé au centre
+    positions[root_node['id']] = (center_x, center_y, 0)
+
+    # Placement des enfants autour du root
+    place_radial(root_node)
+
+    # Les lignes sont dessinées avant les nodes pour rester derrière
+    draw_lines()
+
+    # Dessin des nodes
+    for node in nodes:
+        if node['id'] in positions:
+            x, y, level = positions[node['id']]
+            create_oval_node(node, x, y, level)
+
+    update_scroll_region()
+
 # Cette fonction propose 3 actions sur un node : éditer le texte, supprimer le node ou insérer un nouveau node en dessous
 def edit_node(event, node):
     #if not check_auth():
@@ -193,7 +427,7 @@ def set_db_mode(mode):
     global db_mode
     if (mode != db_mode): # éviter de faire un logout inutile qui ferait perdre la connexion à l'utilisateur
         db_mode = mode
-        #Session.logout()  # forcer le logout pour éviter les incohérences
+        Session.logout()  # forcer le logout pour éviter les incohérences
         lbl_user.config(text="Non connecté")
         lbl_db_mode.config(text=f"Mode DB: {db_mode}", bg="red" if db_mode == "remote" else "green", fg="white")
         display_maps()  # rafraîchir l'affichage des maps pour éviter les incohérences
@@ -202,8 +436,19 @@ def set_db_mode(mode):
 def login():
     show_login(root)
     if Session.is_authenticated():
-        lbl_user.config(text=f"Connecté en tant que {Session.pseudo}") 
+        lbl_user.config(text=f"Connecté en tant que {Session.pseudo}")
 
+# déconnexion
+def logout():
+    if Session.is_unauthenticated():
+        messagebox.showinfo("Info", "Vous n'êtes pas connecté")
+    else:
+        Session.logout()
+        lbl_user.config(text="Non connecté")
+
+# enregistrement (appelle une fenêtre d'enregistrement)
+def register():
+    show_register(root)
 
 # fenêtre principale
 root = tk.Tk()
@@ -216,14 +461,16 @@ menubar = tk.Menu(root)
 
 # Menu Afficher
 display_menu = tk.Menu(menubar, tearoff=0)
-display_menu.add_command(label="Users", command=display_users)
+display_menu.add_command(label="Users", command=display_users) # Afficher users
 display_menu.add_command(label="Maps", command=display_maps)
-display_menu.add_command(label="Nodes", command=display_nodes)
+display_menu.add_command(label="Nodes", command=display_nodes) # Afficher nodes
 menubar.add_cascade(label="Afficher", menu=display_menu)
 
 # Menu Login/Register
 login_menu = tk.Menu(menubar, tearoff=0)
 login_menu.add_command(label="Login", command=login)
+login_menu.add_command(label="Logout", command=logout) # Menu Logout
+login_menu.add_command(label="Register", command=register) # Menu Register
 menubar.add_cascade(label="Login/Register", menu=login_menu)
 
 # Menu local/remote
@@ -273,6 +520,8 @@ frm_options.grid(column=0, row=2, pady=10)
 tk.Label(frm_options, text="Mode d'affichage Mindmap:").pack(anchor='w')
 tk.Radiobutton(frm_options, text="Treeview", variable=display_mode, value='tree', command=refresh_mindmap).pack(anchor='w')
 tk.Radiobutton(frm_options, text="Forum", variable=display_mode, value='forum', command=refresh_mindmap).pack(anchor='w')
+# Radio bouton pour l'affichage radial
+tk.Radiobutton(frm_options, text="Radial", variable=display_mode, value='radial', command=refresh_mindmap).pack(anchor='w')
 
 # frame pour l'affichage des résultats dans left_frame
 frm_result = tk.Frame(left_frame, bg="lightgreen")
