@@ -50,8 +50,7 @@ def get_users(db_mode):
 def get_nodes(db_mode):
     return fetch_all("select map_id, parent_id, author_id, text, level from nodes", None, db_mode)
 
-# fonctions pour insérer, mettre à jour et supprimer des maps et des nodes
-# fonction pour insérer un node (retourne l'id du node créé)
+# fonction pour éditer un node
 def edit_node_db(text, node_id, db_mode="local"):
     db = get_connection(db_mode)
     cursor = db.cursor(dictionary=True)
@@ -67,12 +66,40 @@ def delete_node_db(node_id, db_mode="local"):
     db.commit()
     db.close()
 
+# fonction pour ajouter un node en dessous du node parent
 def insert_node_db(map_id, parent_id, author_id, text, level, db_mode="local"):
     db = get_connection(db_mode)
     cursor = db.cursor(dictionary=True)
     cursor.execute("INSERT INTO nodes (map_id, parent_id, author_id, text, level) VALUES (%s, %s, %s, %s, %s)",(map_id, parent_id, author_id, text, (level+1)))
     db.commit()
     db.close()
+
+# fonctions pour insérer, mettre à jour et supprimer des maps
+# fonction pour insérer une map (retourne l'id du node créé)
+def edit_map_db(title, map_id, db_mode="local"):
+    db = get_connection(db_mode)
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("UPDATE maps SET title=%s WHERE id=%s",(title, map_id))
+    db.commit()
+    db.close()
+
+# fonction pour supprimer des maps
+def delete_map_db(map_id, db_mode="local"):
+    db = get_connection(db_mode)
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("DELETE from maps WHERE id=%s", (map_id,))
+    db.commit()
+    db.close()
+
+# fonction pour ajouter une map supplémentaire avec un node parent par défaut
+def insert_map_db(title, author_id, db_mode="local"):
+    db = get_connection(db_mode)
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("INSERT INTO maps (title, author_id) VALUES (%s, %s)",(title, author_id))
+    db.commit()
+    new_map_id = cursor.lastrowid # récupère la nouvelle map id
+    db.close()
+    return new_map_id # retourne la nouvelle map id pour créer le node principal à la création de la map
 
 # fonction pour vérifier les identifiants de connexion d'un utilisateur (retourne les infos de l'utilisateur si ok, sinon None)
 def check_login(pseudo, password, db_mode="local"):

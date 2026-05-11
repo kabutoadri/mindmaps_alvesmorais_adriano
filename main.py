@@ -1,6 +1,6 @@
 # prototype d'affichage de mindmap en radial et forum
 # avec possibilité d'éditer les nodes (si auteur) ou d'en ajouter en dessous    
-# JCY et Adriano Alves Morais (projet Python) - 2025-2026 -v0.3
+# JCY et Adriano Alves Morais (projet Python) - 2025-2026 -v1.0
 # 11 mai 2026
 # main.py : affichage de la fenêtre principale, gestion de la connexion et des différentes vues (tables + mindmaps)
 
@@ -9,7 +9,7 @@ import tkinter.ttk as ttk
 from tkinter import messagebox, simpledialog
 from login import show_login, show_register
 from tree_display import display_array
-from model import get_maps,  get_nodes_for_map, get_users, get_nodes, edit_node_db, delete_node_db, insert_node_db
+from model import get_maps, get_nodes_for_map, get_users, get_nodes, edit_node_db, delete_node_db, insert_node_db, edit_map_db, delete_map_db, insert_map_db
 from utils import session
 from utils.session import Session
 import math
@@ -27,6 +27,7 @@ def display_maps():
     result = get_maps(db_mode)
     frm_result.tree = display_array(frm_result, result)
     frm_result.tree.bind("<Double-1>", on_map_double_click) # double clic pour afficher le mindmap dans right_frame selon le mode sélectionné (tree, radial ou forum)
+    frm_result.tree.bind("<Button-3>", maps_menu) # Clic droit pour afficher le menu d'édition de map
 
 # affichage des users
 def display_users():
@@ -381,9 +382,8 @@ def edit_text(node):
     if text_modif:
         edit_node_db(text_modif, node["id"], db_mode)
 
+    # rafraichis la mindmap
     refresh_mindmap()
-
-
 
 # propose de supprimer un node (seulement si l'utilisateur est l'auteur du node)
 def delete_node_action(node):
@@ -396,19 +396,120 @@ def delete_node_action(node):
     if messagebox.askyesno("Confirmer la suppression", "Êtes-vous sûr de vouloir supprimer ce node ? Cette action est irréversible."):
         delete_node_db(node["id"], db_mode)
 
+    # rafraichis la mindmap
     refresh_mindmap()
-
 
 # propose d'insérer un nouveau node en dessous du node sélectionné (le nouveau node aura comme parent le node sélectionné)
 def insert_below(node):
     #demande le texte du node
-    text_insert = simpledialog.askstring("Éditer le node", "Nouveau texte:", parent=root)
+    text_insert = simpledialog.askstring("Insérer un node", "Nouveau texte:", parent=root)
 
     # text_insert ne dois pas etre null
     if text_insert:
         insert_node_db(current_map_id, node["id"], Session.id, text_insert, node["level"], db_mode)
 
+    # rafraichis la mindmap
     refresh_mindmap()
+
+# Menu d'édition des maps avec le clique droit
+def maps_menu(event):
+    # Récupère la ligne sur laquelle on a fait clic droit. event.y est la position y de la souris sur la frame
+    selected_item = frm_result.tree.identify_row(event.y)
+
+    # Si on clique dans le vide, on ne fait rien
+    if not selected_item:
+        return
+
+    # Sélectionne visuellement la ligne cliquée
+    frm_result.tree.selection_set(selected_item)
+
+    # Récupère les valeurs de la ligne
+    item = frm_result.tree.item(selected_item)
+    values = item["values"]
+
+    # get_maps retourne : id, title, author_id
+    map_data = {
+        "id": values[0],
+        "title": values[1],
+        "author_id": values[2]
+    }
+
+    # Création du menu clic droit
+    menu = tk.Menu(root, tearoff=0)
+    menu.add_command(label="Éditer", command=lambda: edit_map(map_data))
+    menu.add_command(label="Supprimer", command=lambda: delete_map(map_data))
+    menu.add_command(label="Insérer en dessous", command=lambda: insert_map())
+    menu.post(event.x_root, event.y_root)
+
+# Edition de la map sélectionnée
+def edit_map(map_data):
+    # Vérifie que l'utilisateur est connecté
+    if not check_auth():
+        messagebox.showerror("Erreur", "Vous devez être connecté pour éditer une map.")
+        return
+
+    # Vérifie que l'utilisateur est l'auteur de la map
+    if Session.id != map_data["author_id"]:
+        messagebox.showerror("Erreur", "Vous n'êtes pas propriétaire de cette map.")
+        return
+
+    # Demande le nouveau titre
+    new_title = simpledialog.askstring(
+        "Éditer la map",
+        "Nouveau titre :",
+        initialvalue=map_data["title"],
+        parent=root
+    )
+
+    # Si l'utilisateur annule ou laisse vide, on ne fait rien
+    if not new_title:
+        return
+
+    # Mise à jour en base de données
+    edit_map_db(new_title, map_data["id"], db_mode)
+
+    # Rafraîchit la liste des maps
+    display_maps()
+
+# Edition de la map sélectionnée
+def delete_map(map_data):
+    # Vérifie que l'utilisateur est connecté
+    if not check_auth():
+        messagebox.showerror("Erreur", "Vous devez être connecté pour supprimer une map.")
+        return
+
+    # Vérifie que l'utilisateur est l'auteur de la map
+    if Session.id != map_data["author_id"]:
+        messagebox.showerror("Erreur", "Vous n'êtes pas propriétaire de cette map.")
+        return
+
+    # message d'avertissement avant suppression
+    if messagebox.askyesno("Confirmer la suppression","Êtes-vous sûr de vouloir supprimer cette map ? Cette action est irréversible."):
+        # verifier qu'il n'y a pas de node dans la map à supprimer
+        try:
+            delete_map_db(map_data["id"], db_mode)
+        except:
+            messagebox.showerror("Erreur", "Vous devez d'abord supprimer le node principal.")
+
+    # Rafraîchit la liste des maps
+    display_maps()
+
+def insert_map():
+    # Vérifie que l'utilisateur est connecté
+    if not check_auth():
+        messagebox.showerror("Erreur", "Vous devez être connecté pour insérer une map.")
+        return
+
+    #demande le texte du node
+    text_insert = simpledialog.askstring("Insérer une map", "Nouveau texte:", parent=root)
+
+    # text_insert ne dois pas etre null
+    if text_insert:
+        new_map_id = insert_map_db(text_insert, Session.id, db_mode)
+        insert_node_db(new_map_id, None, Session.id, text_insert, -1, db_mode) # -1 pour le level 0 du node
+
+    # Rafraîchit la liste des maps
+    display_maps()
 
 # Permet de changer le mode de la base de données (local ou remote) et met à jour la variable globale db_mode
 def set_db_mode(mode):
@@ -442,7 +543,7 @@ def register():
 root = tk.Tk()
 
 root.minsize(1200, 800)  # Ajusté pour accommoder les deux frames
-root.title("Mindmaps - Version 0.3")
+root.title("Mindmaps - Version 1.0")
 
 # Création du menu
 menubar = tk.Menu(root)
