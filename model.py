@@ -1,7 +1,6 @@
 # Projet mindmaps : prototype d'affichage de mindmap en radial et forum 
-# JCY pour SI-CA1 (projet Python) - 2025-2026
-# 13 avril 2026
-# Modifications : Adriano Alves Morais, le 04.05.2026
+# JCY et Adriano Alves Morais (projet Python) - 2025-2026
+# 11 mai 2026
 # model.py : définition des fonctions pour interagir avec la base de données
 
 import mysql.connector
@@ -53,6 +52,27 @@ def get_nodes(db_mode):
 
 # fonctions pour insérer, mettre à jour et supprimer des maps et des nodes
 # fonction pour insérer un node (retourne l'id du node créé)
+def edit_node_db(text, node_id, db_mode="local"):
+    db = get_connection(db_mode)
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("UPDATE nodes SET text=%s WHERE id=%s",(text, node_id))
+    db.commit()
+    db.close()
+
+# fonction pour supprimer des nodes
+def delete_node_db(node_id, db_mode="local"):
+    db = get_connection(db_mode)
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("DELETE from nodes WHERE id=%s", (node_id,))
+    db.commit()
+    db.close()
+
+def insert_node_db(map_id, parent_id, author_id, text, level, db_mode="local"):
+    db = get_connection(db_mode)
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("INSERT INTO nodes (map_id, parent_id, author_id, text, level) VALUES (%s, %s, %s, %s, %s)",(map_id, parent_id, author_id, text, (level+1)))
+    db.commit()
+    db.close()
 
 # fonction pour vérifier les identifiants de connexion d'un utilisateur (retourne les infos de l'utilisateur si ok, sinon None)
 def check_login(pseudo, password, db_mode="local"):

@@ -1,8 +1,7 @@
 # prototype d'affichage de mindmap en radial et forum
 # avec possibilité d'éditer les nodes (si auteur) ou d'en ajouter en dessous    
-# JCY pour SI-CA1 (projet Python) - 2025-2026 -v0.1
-# 13 avril 2026
-# Modifications : Adriano Alves Morais, le 04.05.2026
+# JCY et Adriano Alves Morais (projet Python) - 2025-2026 -v0.3
+# 11 mai 2026
 # main.py : affichage de la fenêtre principale, gestion de la connexion et des différentes vues (tables + mindmaps)
 
 import tkinter as tk
@@ -10,7 +9,8 @@ import tkinter.ttk as ttk
 from tkinter import messagebox, simpledialog
 from login import show_login, show_register
 from tree_display import display_array
-from model import get_maps,  get_nodes_for_map, get_users, get_nodes
+from model import get_maps,  get_nodes_for_map, get_users, get_nodes, edit_node_db, delete_node_db, insert_node_db
+from utils import session
 from utils.session import Session
 import math
 
@@ -359,8 +359,9 @@ def display_mindmap_organigramme(frame, nodes):
 
 # Cette fonction propose 3 actions sur un node : éditer le texte, supprimer le node ou insérer un nouveau node en dessous
 def edit_node(event, node):
-    #if not check_auth():
-    #    return
+    if not check_auth():
+        messagebox.showerror("Erreur", "Vous devez être connecté pour éditer un node.")
+        return
     menu = tk.Menu(root, tearoff=0)
     menu.add_command(label="Éditer", command=lambda: edit_text(node))
     menu.add_command(label="Supprimer", command=lambda: delete_node_action(node))
@@ -369,16 +370,45 @@ def edit_node(event, node):
 
 # propose d'éditer le texte d'un node (seulement si l'utilisateur est l'auteur du node)
 def edit_text(node):
-    messagebox.showerror("Erreur", "Pas encore implémenté") # à implémenter : vérifier que l'utilisateur est l'auteur du node, puis proposer une fenêtre de saisie pour éditer le texte du node, puis mettre à jour le node dans la base de données et rafraîchir l'affichage du mindmap
+    # vérifier que l'utilisateur est l'auteur du node
+    if Session.id != node["author_id"]:
+        messagebox.showerror("Erreur", "Vous n'êtes pas propriétaire du node")
+        return
+
+    text_modif = simpledialog.askstring("Éditer le node", "Nouveau texte:", initialvalue=node["text"], parent=root)
+
+    # text_modif ne dois pas etre null
+    if text_modif:
+        edit_node_db(text_modif, node["id"], db_mode)
+
+    refresh_mindmap()
+
+
 
 # propose de supprimer un node (seulement si l'utilisateur est l'auteur du node)
 def delete_node_action(node):
-    messagebox.showerror("Erreur", "Pas encore implémenté") # à implémenter : vérifier que l'utilisateur est l'auteur du node, puis proposer une confirmation pour supprimer le node, puis supprimer le node dans la base de données et rafraîchir l'affichage du mindmap
+    # vérifier que l'utilisateur est l'auteur du node
+    if Session.id != node["author_id"]:
+        messagebox.showerror("Erreur", "Vous n'êtes pas propriétaire du node")
+        return
+
+    # message d'avertissement avant suppression
+    if messagebox.askyesno("Confirmer la suppression", "Êtes-vous sûr de vouloir supprimer ce node ? Cette action est irréversible."):
+        delete_node_db(node["id"], db_mode)
+
+    refresh_mindmap()
+
 
 # propose d'insérer un nouveau node en dessous du node sélectionné (le nouveau node aura comme parent le node sélectionné)
 def insert_below(node):
-    messagebox.showerror("Erreur", "Pas encore implémenté") # à implémenter : proposer une fenêtre de saisie pour insérer le texte du nouveau node, puis insérer le node dans la base de données et rafraîchir l'affichage du mindmap
+    #demande le texte du node
+    text_insert = simpledialog.askstring("Éditer le node", "Nouveau texte:", parent=root)
 
+    # text_insert ne dois pas etre null
+    if text_insert:
+        insert_node_db(current_map_id, node["id"], Session.id, text_insert, node["level"], db_mode)
+
+    refresh_mindmap()
 
 # Permet de changer le mode de la base de données (local ou remote) et met à jour la variable globale db_mode
 def set_db_mode(mode):
@@ -412,7 +442,7 @@ def register():
 root = tk.Tk()
 
 root.minsize(1200, 800)  # Ajusté pour accommoder les deux frames
-root.title("Mindmaps - Version de base v0.1")
+root.title("Mindmaps - Version 0.3")
 
 # Création du menu
 menubar = tk.Menu(root)

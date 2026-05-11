@@ -1,7 +1,6 @@
 # Projet mindmaps : prototype d'affichage de mindmap en radial et forum 
-# JCY pour SI-CA1 (projet Python) - 2025-2026
-# 13 avril 2026
-# Modifications : Adriano Alves Morais, le 04.05.2026
+# JCY et Adriano Alves Morais (projet Python) - 2025-2026
+# 11 mai 2026
 # session.py : Gestion de la session utilisateur (stockage du pseudo et du niveau d'accès)
 
 # utils/session.py : gestion de la session utilisateur (stockage du pseudo et du niveau d'accès)
