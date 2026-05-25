@@ -1,6 +1,6 @@
 # Projet mindmaps : prototype d'affichage de mindmap en radial et forum 
 # JCY et Adriano Alves Morais (projet Python) - 2025-2026
-# 11 mai 2026
+# 25 mai 2026
 # model.py : définition des fonctions pour interagir avec la base de données
 
 import mysql.connector
@@ -136,4 +136,19 @@ def save_register(pseudo, password, color, db_mode="local"):
     cursor.execute("INSERT INTO users (pseudo, hash, level, color) VALUES (%s, %s, %s, %s)", (pseudo, password, 1, color))
     db.commit()
     db.close()
-    pass
+
+# fonction pour récupérer un profil utilisateur en particulier
+def get_user_profile(user_id, db_mode="local"):
+    return fetch_all(
+        "SELECT id, pseudo, color FROM users WHERE id=%s",
+        (user_id,),
+        db_mode
+    )
+
+# fonction pour mettre à jour le nouveau profil
+def update_user_profile(user_id, pseudo, color, db_mode="local"):
+    db = get_connection(db_mode)
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("UPDATE users SET pseudo=%s, color=%s WHERE id=%s", (pseudo, color, user_id))
+    db.commit()
+    db.close()

@@ -1,6 +1,6 @@
 # Projet mindmaps : prototype d'affichage de mindmap en radial et forum 
 # JCY et Adriano Alves Morais (projet Python) - 2025-2026
-# 11 mai 2026
+# 25 mai 2026
 # login.py : affichage de la fenêtre de connexion et d'inscription
 
 import tkinter as tk
@@ -105,5 +105,5 @@ def show_register(parent, db_mode="local"):
 
     tk.Button(win, text="S'enregistrer", command=attempt_register).grid(row=4, column=0, columnspan=2)
 
-    # Empêche d'accéder à la fenêtre principale tant que login est ouvert
+    # Empêche d'accéder à la fenêtre principale tant que register est ouvert
     parent.wait_window(win)

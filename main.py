@@ -1,15 +1,15 @@
 # prototype d'affichage de mindmap en radial et forum
 # avec possibilité d'éditer les nodes (si auteur) ou d'en ajouter en dessous    
 # JCY et Adriano Alves Morais (projet Python) - 2025-2026 -v1.0
-# 11 mai 2026
+# 25 mai 2026
 # main.py : affichage de la fenêtre principale, gestion de la connexion et des différentes vues (tables + mindmaps)
 
 import tkinter as tk
 import tkinter.ttk as ttk
-from tkinter import messagebox, simpledialog
+from tkinter import messagebox, simpledialog, colorchooser
 from login import show_login, show_register
 from tree_display import display_array
-from model import get_maps, get_nodes_for_map, get_users, get_nodes, edit_node_db, delete_node_db, insert_node_db, edit_map_db, delete_map_db, insert_map_db
+from model import get_maps, get_nodes_for_map, get_users, get_nodes, edit_node_db, delete_node_db, insert_node_db, edit_map_db, delete_map_db, insert_map_db, update_user_profile, get_user_profile
 from utils import session
 from utils.session import Session
 import math
@@ -32,6 +32,7 @@ def display_maps():
 # affichage des users
 def display_users():
     result = get_users(db_mode)
+
     frm_result.tree = display_array(frm_result, result)
 
 # affichage des nodes
@@ -420,6 +421,11 @@ def maps_menu(event):
     if not selected_item:
         return
 
+    # Vérifie que l'utilisateur est connecté
+    if not check_auth():
+        messagebox.showerror("Erreur", "Vous devez être connecté pour éditer une map.")
+        return
+
     # Sélectionne visuellement la ligne cliquée
     frm_result.tree.selection_set(selected_item)
 
@@ -427,11 +433,11 @@ def maps_menu(event):
     item = frm_result.tree.item(selected_item)
     values = item["values"]
 
-    # get_maps retourne : id, title, author_id
+    # get_maps retourne : id, title, author_id, level
     map_data = {
         "id": values[0],
         "title": values[1],
-        "author_id": values[2]
+        "author_id": values[2],
     }
 
     # Création du menu clic droit
@@ -443,13 +449,8 @@ def maps_menu(event):
 
 # Edition de la map sélectionnée
 def edit_map(map_data):
-    # Vérifie que l'utilisateur est connecté
-    if not check_auth():
-        messagebox.showerror("Erreur", "Vous devez être connecté pour éditer une map.")
-        return
-
-    # Vérifie que l'utilisateur est l'auteur de la map
-    if Session.id != map_data["author_id"]:
+    # Vérifie que l'utilisateur est l'auteur de la map ou admin
+    if Session.id != map_data["author_id"] and Session.level != 2:
         messagebox.showerror("Erreur", "Vous n'êtes pas propriétaire de cette map.")
         return
 
@@ -473,13 +474,9 @@ def edit_map(map_data):
 
 # Edition de la map sélectionnée
 def delete_map(map_data):
-    # Vérifie que l'utilisateur est connecté
-    if not check_auth():
-        messagebox.showerror("Erreur", "Vous devez être connecté pour supprimer une map.")
-        return
 
-    # Vérifie que l'utilisateur est l'auteur de la map
-    if Session.id != map_data["author_id"]:
+    # Vérifie que l'utilisateur est l'auteur de la map ou admin
+    if Session.id != map_data["author_id"] and Session.level != 2:
         messagebox.showerror("Erreur", "Vous n'êtes pas propriétaire de cette map.")
         return
 
@@ -495,11 +492,6 @@ def delete_map(map_data):
     display_maps()
 
 def insert_map():
-    # Vérifie que l'utilisateur est connecté
-    if not check_auth():
-        messagebox.showerror("Erreur", "Vous devez être connecté pour insérer une map.")
-        return
-
     #demande le texte du node
     text_insert = simpledialog.askstring("Insérer une map", "Nouveau texte:", parent=root)
 
@@ -539,6 +531,86 @@ def logout():
 def register():
     show_register(root)
 
+# edition de son profile utilisateur
+def edit_profile(parent, db_mode="local"):
+    # Vérifie que l'utilisateur est connecté
+    if not check_auth():
+        messagebox.showerror("Erreur", "Vous devez être connecté pour modifier votre profil.")
+        return
+
+    # Récupère les informations du profil
+    result = get_user_profile(Session.id, db_mode)
+
+    # stock l'utilisateur seul
+    user = result[0]
+
+    win = tk.Toplevel(parent)
+    win.title("Profile")
+
+    # Empêcher d'interagir avec la fenêtre principale
+    win.transient(parent)
+    win.grab_set()
+
+    tk.Label(win, text="Pseudo").grid(row=0, column=0, padx=20, pady=10)
+    tk.Label(win, text="Couleur").grid(row=1, column=0, padx=20, pady=10)
+
+    entry_pseudo = tk.Entry(win)
+    entry_pseudo.grid(row=0, column=1, padx=20, pady=10)
+
+    # Insère le pseudo actuel dans le champ
+    entry_pseudo.insert(0, user["pseudo"])
+
+    # Couleur actuelle de l'utilisateur
+    selected_color = tk.StringVar(value=user["color"])
+
+    def choose_color():
+        color = colorchooser.askcolor(
+            title="Choisissez une couleur",
+            initialcolor=selected_color.get()
+        )[1]
+
+        if color:
+            selected_color.set(color)
+            color_button.config(bg=color)
+
+    color_button = tk.Button(
+        win,
+        text="Choisir une couleur",
+        fg="#000000",
+        bg=selected_color.get(),
+        command=choose_color
+    )
+    color_button.grid(row=1, column=1, padx=20, pady=10)
+
+    def save_profile():
+        new_pseudo = entry_pseudo.get()
+        new_color = selected_color.get()
+
+        if not new_pseudo:
+            messagebox.showerror("Erreur", "Le pseudo est obligatoire.")
+            return
+
+        update_user_profile(Session.id, new_pseudo, new_color, db_mode)
+
+        # Met à jour aussi la session actuelle
+        Session.pseudo = new_pseudo
+
+        lbl_user.config(text=f"Connecté en tant que {Session.pseudo}")
+
+        messagebox.showinfo("OK", "Profil modifié avec succès.")
+        win.destroy()
+
+        # Rafraîchit la mindmap affichée pour mettre à jour les couleurs
+        refresh_mindmap()
+
+    tk.Button(
+        win,
+        text="Enregistrer",
+        command=save_profile
+    ).grid(row=2, column=0, columnspan=2, pady=15)
+
+    parent.wait_window(win)
+
 # fenêtre principale
 root = tk.Tk()
 
@@ -567,6 +639,9 @@ db_menu = tk.Menu(menubar, tearoff=0)
 db_menu.add_command(label="Local", command=lambda: set_db_mode('local'))
 db_menu.add_command(label="Remote", command=lambda: set_db_mode('remote'))
 menubar.add_cascade(label="Mode DB", menu=db_menu)
+
+# Menu profile
+menubar.add_command(label="Profile", command=lambda: edit_profile(root, db_mode))
 
 root.config(menu=menubar)
 
