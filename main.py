@@ -395,10 +395,10 @@ def edit_node(event, node):
     menu.add_command(label="Insérer en dessous", command=lambda: insert_below(node))
     menu.post(event.x_root, event.y_root)
 
-# propose d'éditer le texte d'un node (seulement si l'utilisateur est l'auteur du node)
+# propose d'éditer le texte d'un node
 def edit_text(node):
     # vérifier que l'utilisateur est l'auteur du node
-    if Session.id != node["author_id"]:
+    if Session.id != node["author_id"] and Session.level != 2: # les admins peuvent éditer tous les nodes
         messagebox.showerror("Erreur", "Vous n'êtes pas propriétaire du node")
         return
 
@@ -414,7 +414,7 @@ def edit_text(node):
 # propose de supprimer un node (seulement si l'utilisateur est l'auteur du node)
 def delete_node_action(node):
     # vérifier que l'utilisateur est l'auteur du node
-    if Session.id != node["author_id"]:
+    if Session.id != node["author_id"] and Session.level != 2: # les admins peuvent supprimer tous les nodes
         messagebox.showerror("Erreur", "Vous n'êtes pas propriétaire du node")
         return
 
