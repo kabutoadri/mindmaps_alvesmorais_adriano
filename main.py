@@ -9,14 +9,15 @@ import tkinter.ttk as ttk
 from tkinter import messagebox, simpledialog, colorchooser
 from login import show_login, show_register
 from tree_display import display_array
-from model import get_maps, get_nodes_for_map, get_users, get_nodes, edit_node_db, delete_node_db, insert_node_db, edit_map_db, delete_map_db, insert_map_db, update_user_profile, get_user_profile
-from utils import session
+from model import get_maps, get_nodes_for_map, get_users, get_nodes, edit_node_db, delete_node_db, insert_node_db, edit_map_db, delete_map_db, insert_map_db, update_user_profile, get_user_profile, check_login
 from utils.session import Session
-import math
 
 # Variable globale pour le mode DB
 db_mode = None
 current_map_id = None
+
+# variable globale pour la vue du frame gauche lors du rafraichissement général
+current_left_frame = ""
 
 # Vérification de connexion
 def check_auth():
@@ -24,6 +25,9 @@ def check_auth():
 
 # affichage des maps 
 def display_maps():
+    global current_left_frame
+    current_left_frame = "maps"
+
     result = get_maps(db_mode)
     frm_result.tree = display_array(frm_result, result)
     frm_result.tree.bind("<Double-1>", on_map_double_click) # double clic pour afficher le mindmap dans right_frame selon le mode sélectionné (tree, radial ou forum)
@@ -31,12 +35,18 @@ def display_maps():
 
 # affichage des users
 def display_users():
+    global current_left_frame
+    current_left_frame = "users"
+
     result = get_users(db_mode)
 
     frm_result.tree = display_array(frm_result, result)
 
 # affichage des nodes
 def display_nodes():
+    global current_left_frame
+    current_left_frame = "nodes"
+
     result = get_nodes(db_mode)
 
     # remplace les valeurs none par -1 pour éviter les erreurs
@@ -75,9 +85,21 @@ def display_mindmap(map_id):
     else:
         tk.Label(right_frame, text="Aucun node pour ce mindmap").pack()
 
+# Rafraichit le mindmap
 def refresh_mindmap():
     if current_map_id is not None:
         display_mindmap(current_map_id)
+
+# Rafraichit tout : le mindmap et la liste des maps, users ou nodes selon ce qui est affiché dans left_frame
+def refresh_all():
+    refresh_mindmap()
+
+    if current_left_frame == "nodes":
+        display_nodes()
+    elif current_left_frame == "users":
+        display_users()
+    elif current_left_frame == "maps":
+        display_maps()
 
 # Affichage du mindmap en TreeView (version simple)
 def display_mindmap_tree(frame, nodes):
@@ -184,15 +206,18 @@ def display_mindmap_forum(frame, nodes):
             x1 + radius, y1 ]
 
         return canvas.create_polygon(points, smooth=True, **kwargs)
+
     # Place les nodes en mode forum de manière récursive
     def place_forum(node, x, y, width_percent, level=0):
         width = int(canvas_width * width_percent / 100)
         item = create_rounded_rectangle(canvas, x, y, x + width, y + node_height, radius=8, fill='lightblue' if level == 0 else node["color"], outline='black')
         canvas.create_text(x + width/2, y + node_height/2, text=node['text'][:40], anchor='center', font=("Arial", 12))  # Police augmentée
+
         # Binder le clic droit sur le node pour éditer
         canvas.tag_bind(item, "<Button-3>", lambda e, n=node: edit_node(e, n)) # n contient les infos du node pour l'édition    
         children = [n for n in nodes if n['parent_id'] == node['id']]
         total_height = node_height + 10  # hauteur du node + marge
+
         if children:
             child_x = x + int(canvas_width * 20 / 100)  # décalage de 20%
             child_width_percent = max(width_percent - 5, 10)  # diminuer de 5% par niveau, min 10%
@@ -397,6 +422,13 @@ def delete_node_action(node):
     if messagebox.askyesno("Confirmer la suppression", "Êtes-vous sûr de vouloir supprimer ce node ? Cette action est irréversible."):
         delete_node_db(node["id"], db_mode)
 
+        # Supprime la map si on supprime le node principal
+        if node["parent_id"] is None:
+            delete_map_db(node["map_id"], db_mode)
+
+            # Rafraîchit la liste des maps
+            display_maps()
+
     # rafraichis la mindmap
     refresh_mindmap()
 
@@ -506,7 +538,7 @@ def insert_map():
 # Permet de changer le mode de la base de données (local ou remote) et met à jour la variable globale db_mode
 def set_db_mode(mode):
     global db_mode
-    if (mode != db_mode): # éviter de faire un logout inutile qui ferait perdre la connexion à l'utilisateur
+    if mode != db_mode: # éviter de faire un logout inutile qui ferait perdre la connexion à l'utilisateur
         db_mode = mode
         Session.logout()  # forcer le logout pour éviter les incohérences
         lbl_user.config(text="Non connecté")
@@ -515,9 +547,9 @@ def set_db_mode(mode):
 
 # connexion (appelle une fenêtre de login)
 def login():
-    show_login(root)
+    show_login(root, db_mode)
     if Session.is_authenticated():
-        lbl_user.config(text=f"Connecté en tant que {Session.pseudo}")
+        lbl_user.config(text=f"Connecté en tant que {Session.pseudo}/{Session.level}")
 
 # déconnexion
 def logout():
@@ -529,7 +561,7 @@ def logout():
 
 # enregistrement (appelle une fenêtre d'enregistrement)
 def register():
-    show_register(root)
+    show_register(root, db_mode)
 
 # edition de son profile utilisateur
 def edit_profile(parent, db_mode="local"):
@@ -552,13 +584,25 @@ def edit_profile(parent, db_mode="local"):
     win.grab_set()
 
     tk.Label(win, text="Pseudo").grid(row=0, column=0, padx=20, pady=10)
-    tk.Label(win, text="Couleur").grid(row=1, column=0, padx=20, pady=10)
+    tk.Label(win, text="Mot de passe actuel").grid(row=1, column=0, padx=20, pady=10)
+    tk.Label(win, text="Nouveau mot de passe").grid(row=2, column=0, padx=20, pady=10)
+    tk.Label(win, text="Confirmer le nouveau mot de passe").grid(row=3, column=0, padx=20, pady=10)
+    tk.Label(win, text="Couleur").grid(row=4, column=0, padx=20, pady=10)
 
     entry_pseudo = tk.Entry(win)
     entry_pseudo.grid(row=0, column=1, padx=20, pady=10)
 
     # Insère le pseudo actuel dans le champ
     entry_pseudo.insert(0, user["pseudo"])
+
+    entry_current_password = tk.Entry(win, show="*")
+    entry_current_password.grid(row=1, column=1, padx=20, pady=10)
+
+    entry_new_password = tk.Entry(win, show="*")
+    entry_new_password.grid(row=2, column=1, padx=20, pady=10)
+
+    entry_confirm_password = tk.Entry(win, show="*")
+    entry_confirm_password.grid(row=3, column=1, padx=20, pady=10)
 
     # Couleur actuelle de l'utilisateur
     selected_color = tk.StringVar(value=user["color"])
@@ -580,22 +624,42 @@ def edit_profile(parent, db_mode="local"):
         bg=selected_color.get(),
         command=choose_color
     )
-    color_button.grid(row=1, column=1, padx=20, pady=10)
+    color_button.grid(row=4, column=1, padx=20, pady=10)
 
     def save_profile():
+        old_pseudo = user["pseudo"]
         new_pseudo = entry_pseudo.get()
         new_color = selected_color.get()
+        current_password = entry_current_password.get()
+        new_password = entry_new_password.get()
+        new_confirm_password = entry_confirm_password.get()
 
         if not new_pseudo:
             messagebox.showerror("Erreur", "Le pseudo est obligatoire.")
             return
 
-        update_user_profile(Session.id, new_pseudo, new_color, db_mode)
+        if check_login(old_pseudo, current_password, db_mode):
+            if new_password != new_confirm_password:
+                messagebox.showerror("Erreur", "Les nouveaux mots de passe ne correspondent pas.")
+                return
+            elif not new_password or not new_confirm_password:
+                messagebox.showerror("Erreur", "Les nouveaux mots de passe sont vides")
+                return
+        elif not current_password:
+            if new_password:
+                messagebox.showerror("Erreur", "Le mot de passe actuel est requis pour changer le mot de passe.")
+                return
+            new_password = None  # Pas de changement de mot de passe
+        else:
+            messagebox.showerror("Erreur", "Les champs ne correspondent pas.")
+            return
+
+        update_user_profile(Session.id, new_pseudo, new_color, new_password, db_mode)
 
         # Met à jour aussi la session actuelle
         Session.pseudo = new_pseudo
 
-        lbl_user.config(text=f"Connecté en tant que {Session.pseudo}")
+        lbl_user.config(text=f"Connecté en tant que {Session.pseudo}/{Session.level}")
 
         messagebox.showinfo("OK", "Profil modifié avec succès.")
         win.destroy()
@@ -607,7 +671,7 @@ def edit_profile(parent, db_mode="local"):
         win,
         text="Enregistrer",
         command=save_profile
-    ).grid(row=2, column=0, columnspan=2, pady=15)
+    ).grid(row=5, column=0, columnspan=2, pady=15)
 
     parent.wait_window(win)
 
@@ -616,6 +680,8 @@ root = tk.Tk()
 
 root.minsize(1200, 800)  # Ajusté pour accommoder les deux frames
 root.title("Mindmaps - Version 1.0")
+
+root.bind("<F5>", lambda e: refresh_all())  # F5 pour rafraîchir tout
 
 # Création du menu
 menubar = tk.Menu(root)
@@ -678,7 +744,7 @@ frm_buttons = tk.Frame(left_frame, bg="lightblue")
 frm_buttons.grid(column=0, row=1, pady=10)
 
 # frame pour les options d'affichage
-frm_options = tk.Frame(left_frame, bg="lightyellow")
+frm_options = tk.Frame(left_frame, bg="#f0f0f0")
 frm_options.grid(column=0, row=2, pady=10)
 
 tk.Label(frm_options, text="Mode d'affichage Mindmap:").pack(anchor='w')

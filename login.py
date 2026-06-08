@@ -7,7 +7,6 @@ import tkinter as tk
 from tkinter import messagebox, colorchooser
 from model import check_login, check_register, save_register
 from utils.session import Session
-import bcrypt
 
 def show_login(parent, db_mode="local" ):
     if Session.is_authenticated():
@@ -98,8 +97,8 @@ def show_register(parent, db_mode="local"):
             if user:
                 messagebox.showerror("Erreur", f"un compte avec le pseudo {user['pseudo']} éxiste déjà.")
             else:
-                password = bcrypt.hashpw(entry_pass.get().encode(), bcrypt.gensalt()) # chiffrement du mot de passe
-                save_register(entry_pseudo.get(), password, color, db_mode) # enregistrement dans la db
+                get_password = entry_pass.get()
+                save_register(entry_pseudo.get(), get_password, color, db_mode) # enregistrement dans la db
                 messagebox.showinfo("OK", "Enregistrement réussi !")
                 win.destroy()
 

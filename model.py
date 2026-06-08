@@ -38,7 +38,7 @@ def get_maps(db_mode):
 
 # renvoie la liste de tous les nodes d'un map (avec le pseudo de l'auteur et sa couleur)
 def get_nodes_for_map(map_id, db_mode):
-    return fetch_all("select nodes.id, parent_id, author_id, text, nodes.level,users.color " \
+    return fetch_all("select nodes.id, nodes.map_id, parent_id, author_id, text, nodes.level,users.color " \
     "from nodes inner join users on nodes.author_id = users.id " \
     "where map_id=%s", (map_id,), db_mode)
 
@@ -130,9 +130,10 @@ def check_register(pseudo, db_mode="local"):
     return None
 
 # fonction pour enregistrer un nouvel utilisateur (pseudo, mot de passe hashé, couleur)
-def save_register(pseudo, password, color, db_mode="local"):
+def save_register(pseudo, get_password, color, db_mode="local"):
     db = get_connection(db_mode)
     cursor = db.cursor(dictionary=True)
+    password = bcrypt.hashpw(get_password.encode(), bcrypt.gensalt())  # chiffrement du mot de passe
     cursor.execute("INSERT INTO users (pseudo, hash, level, color) VALUES (%s, %s, %s, %s)", (pseudo, password, 1, color))
     db.commit()
     db.close()
@@ -146,9 +147,13 @@ def get_user_profile(user_id, db_mode="local"):
     )
 
 # fonction pour mettre à jour le nouveau profil
-def update_user_profile(user_id, pseudo, color, db_mode="local"):
+def update_user_profile(user_id, pseudo, color, hash, db_mode="local"):
     db = get_connection(db_mode)
     cursor = db.cursor(dictionary=True)
-    cursor.execute("UPDATE users SET pseudo=%s, color=%s WHERE id=%s", (pseudo, color, user_id))
+    if hash is None:
+        cursor.execute("UPDATE users SET pseudo=%s, color=%s WHERE id=%s", (pseudo, color, user_id))
+    else:
+        password = bcrypt.hashpw(hash.encode(), bcrypt.gensalt())  # chiffrement du mot de passe
+        cursor.execute("UPDATE users SET pseudo=%s, hash=%s, color=%s WHERE id=%s", (pseudo, password, color, user_id))
     db.commit()
     db.close()
