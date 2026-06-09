@@ -15,3 +15,15 @@ L'application permettra aux utilisateurs de créer, organiser et visualiser des 
 
 ## Librairies annexes
 Aucune librairie annexe n'est à installer pour utiliser cette application.
+
+### Ce que j’ai appris
+- Connection BD : <span style="color: lightblue;">0 => 80</span>
+- Séparation model.py : <span style="color: lightblue;">50 => 80</span>
+- TreeView : <span style="color: lightblue;">0 => 60</span>
+- Canvas dans tkinter : <span style="color: lightblue;">0 => 70</span>
+- Menus classiques et/ou contextuels : <span style="color: lightblue;">40 => 80</span>
+- Programmation récursive : <span style="color: lightblue;">0 => 90</span>
+- Login, logout, register : <span style="color: lightblue;">0 => 70</span>
+- Classe Session : <span style="color: lightblue;">0 => 50</span>
+- Tester une application : <span style="color: lightblue;">50 => 80</span>
+- .env (avec exclusion de github) : <span style="color: lightblue;">0 => 90</span>
